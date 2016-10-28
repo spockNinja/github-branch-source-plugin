@@ -35,6 +35,7 @@ import com.cloudbees.plugins.credentials.common.StandardUsernamePasswordCredenti
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 import com.cloudbees.plugins.credentials.domains.URIRequirementBuilder;
 import com.google.common.hash.Hashing;
+import com.squareup.okhttp.Cache;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.OkUrlFactory;
 import hudson.Util;
@@ -53,6 +54,7 @@ import jenkins.scm.api.SCMSourceOwner;
 import org.apache.commons.lang.StringUtils;
 import org.jenkinsci.plugins.gitclient.GitClient;
 import org.jenkinsci.plugins.github.config.GitHubServerConfig;
+import org.jenkinsci.plugins.github.internal.GitHubClientCacheOps;
 import org.kohsuke.github.GitHub;
 import org.kohsuke.github.GitHubBuilder;
 import org.kohsuke.github.RateLimitHandler;
@@ -60,6 +62,7 @@ import org.kohsuke.github.extras.OkHttpConnector;
 
 import static org.apache.commons.lang3.StringUtils.trimToEmpty;
 import static org.jenkinsci.plugins.github.config.GitHubServerConfig.GITHUB_URL;
+import static org.jenkinsci.plugins.github.internal.GitHubClientCacheOps.toCacheDir;
 
 /**
  * Utilities that could perhaps be moved into {@code github-api}.
@@ -83,6 +86,7 @@ public class Connector {
     }
 
     public static @Nonnull GitHub connect(@CheckForNull String apiUri, @CheckForNull StandardCredentials credentials) throws IOException {
+        GitHubServerConfig config = new GitHubServerConfig(credentials!=null ? credentials.getId(): null);
         String apiUrl = Util.fixEmptyAndTrim(apiUri);
         String host;
         try {
