@@ -96,6 +96,8 @@ import java.util.HashSet;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.jenkinsci.plugins.gitclient.CheckoutCommand;
+import org.jenkinsci.plugins.gitclient.CloneCommand;
+import org.jenkinsci.plugins.gitclient.FetchCommand;
 import org.jenkinsci.plugins.gitclient.GitClient;
 import org.jenkinsci.plugins.gitclient.MergeCommand;
 import static org.jenkinsci.plugins.github.config.GitHubServerConfig.GITHUB_URL;
@@ -612,17 +614,18 @@ public class GitHubSCMSource extends AbstractGitSCMSource {
 
     @Override
     public SCM build(SCMHead head, SCMRevision revision) {
+        GitSCM scm;
         if (revision == null) {
             // TODO will this work sanely for PRs? Branch.scm seems to be used only as a fallback for SCMBinder/SCMVar where they would perhaps better just report an error.
-            return super.build(head, null);
+            scm = (GitSCM) super.build(head, null);
         } else if (head instanceof PullRequestSCMHead) {
             if (!(revision instanceof PullRequestSCMRevision)) {
                 // TODO this seems to happen for PR-6-unmerged in cloudbeers/PR-demo; why?
                 LOGGER.log(Level.WARNING, "Unexpected revision class {0} for {1}", new Object[] {revision.getClass().getName(), head});
-                return super.build(head, revision);
+                scm = (GitSCM) super.build(head, revision);
             }
             PullRequestSCMRevision prRev = (PullRequestSCMRevision) revision;
-            GitSCM scm = (GitSCM) super.build(/* does this matter? */head, new SCMRevisionImpl(/* again probably irrelevant */head, prRev.getPullHash()));
+            scm = (GitSCM) super.build(/* does this matter? */head, new SCMRevisionImpl(/* again probably irrelevant */head, prRev.getPullHash()));
             if (((PullRequestSCMHead) head).isMerge()) {
                 PullRequestAction action = head.getAction(PullRequestAction.class);
                 String baseName;
@@ -633,9 +636,30 @@ public class GitHubSCMSource extends AbstractGitSCMSource {
                 }
                 scm.getExtensions().add(new MergeWith(baseName, prRev.getBaseHash()));
             }
-            return scm;
         } else {
-            return super.build(head, /* casting just as an assertion */(SCMRevisionImpl) revision);
+            scm = (GitSCM) super.build(head, /* casting just as an assertion */(SCMRevisionImpl) revision);
+        }
+        scm.getExtensions().add(new CustomExtension());
+        return scm;
+    }
+
+    /*
+     * Piping the CloneOptions extension to do what we need is not working.
+     * This is a custom extension to make the clone shallow and not fetch tags.
+     */
+    private static class CustomExtension extends GitSCMExtension {
+        @Override
+        public void decorateCloneCommand(GitSCM scm, Run<?, ?> build, GitClient git, TaskListener listener, CloneCommand cmd) throws IOException, InterruptedException, GitException {
+            cmd.shallow();
+            cmd.tags(false);
+            cmd.timeout(new Integer(600));
+        }
+
+        @Override
+        public void decorateFetchCommand(GitSCM scm, GitClient git, TaskListener listener, FetchCommand cmd) throws IOException, InterruptedException, GitException {
+            cmd.shallow(true);
+            cmd.tags(false);
+            cmd.timeout(new Integer(600));
         }
     }
     /**
