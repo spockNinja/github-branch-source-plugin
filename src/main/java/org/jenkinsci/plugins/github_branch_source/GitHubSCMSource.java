@@ -650,14 +650,12 @@ public class GitHubSCMSource extends AbstractGitSCMSource {
     private static class CustomExtension extends GitSCMExtension {
         @Override
         public void decorateCloneCommand(GitSCM scm, Run<?, ?> build, GitClient git, TaskListener listener, CloneCommand cmd) throws IOException, InterruptedException, GitException {
-            cmd.shallow();
             cmd.tags(false);
             cmd.timeout(new Integer(600));
         }
 
         @Override
         public void decorateFetchCommand(GitSCM scm, GitClient git, TaskListener listener, FetchCommand cmd) throws IOException, InterruptedException, GitException {
-            cmd.shallow(true);
             cmd.tags(false);
             cmd.timeout(new Integer(600));
         }
